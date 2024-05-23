@@ -23,9 +23,9 @@ async def on_ready():
 
         # Keep trying
         await update()
-
+    
     finally:
-        main.driver.quit(0)
+        main.driver.quit()
 
 @bot.event
 async def update():
@@ -36,6 +36,7 @@ async def update():
     while True:
         subjects = main.load_data()
         updates = main.write_data(subjects)
+        print(updates)
         shishi_user = await bot.fetch_user(me_id)
         alaa_user = await bot.fetch_user(alaa_id)
         if updates != '':

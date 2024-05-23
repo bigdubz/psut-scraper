@@ -7,6 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 from variables import USERID, PASSWORD
+import traceback
 import time
 import json
 
@@ -25,10 +26,19 @@ regis_url_2 = "https://portal.psut.edu.jo:5050/StudentServices/StudentRegistrati
 
 
 def process_data() -> str:
-    login()
-    nav_to_stud_reg()
-    load_data()
-    return write_data()
+    try:
+        login()
+        time.sleep(5)
+        nav_to_stud_reg()
+        time.sleep(5)
+        dct = load_data()
+        print(write_data(dct))
+
+    except Exception:
+        print(traceback.format_exc())
+    
+    finally:
+        driver.quit()
 
 
 def login():
@@ -74,6 +84,7 @@ def load_data():
         .text
         .split('\n')
     )
+
     pages = page1[32:]
     add_data(page1[1:len(page1) - len(pages) - 1], subjects)
     time.sleep(1)
