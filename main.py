@@ -6,16 +6,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
-import traceback
+from variables import USERID, PASSWORD
 import time
 import json
 
-# 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 github token cli for later
-
-login_info = {
-    "UserID": "20230798",
-    "Password": "Yamen153246846!"
-}
 
 chrome_options = Options()
 chrome_options.add_argument("--headless")
@@ -29,30 +23,20 @@ login_url = "https://portal.psut.edu.jo/"
 regis_url = "https://portal.psut.edu.jo/Home/RegWebStudent?target=_blank"
 regis_url_2 = "https://portal.psut.edu.jo:5050/StudentServices/StudentRegistration.aspx"
 
-subjects = {}
 
-
-def process_data():
-    try:
-        login()
-        nav_to_stud_reg()
-        load_data()
-        # print_data()
-        write_data()
-
-    except Exception:
-        print(traceback.format_exc())
-
-    finally:
-        driver.quit()
+def process_data() -> str:
+    login()
+    nav_to_stud_reg()
+    load_data()
+    return write_data()
 
 
 def login():
     driver.get(login_url)
-    username_field = driver.find_element(By.NAME, list(login_info.keys())[0])
-    username_field.send_keys(login_info["UserID"])
-    password_field = driver.find_element(By.NAME, list(login_info.keys())[1])
-    password_field.send_keys(login_info["Password"])
+    username_field = driver.find_element(By.NAME, "UserID")
+    username_field.send_keys(USERID)
+    password_field = driver.find_element(By.NAME, "Password")
+    password_field.send_keys(PASSWORD)
     password_field.send_keys(Keys.RETURN)
 
 
@@ -73,6 +57,16 @@ def nav_to_stud_reg():
 
 
 def load_data():
+    subjects = {}
+
+    # refresh_page
+    driver.get(driver.current_url)
+    time.sleep(2)
+
+    # Click the search button
+    driver.find_element(By.ID, "ContentPlaceHolder1_btnSearch").click()
+    time.sleep(2)
+
     # Do page 1 first as it's the landing page (no page button for current page exists for some reason lol)
     page1 = (
         driver
@@ -81,7 +75,7 @@ def load_data():
         .split('\n')
     )
     pages = page1[32:]
-    add_data(page1[1:len(page1) - len(pages) - 1])
+    add_data(page1[1:len(page1) - len(pages) - 1], subjects)
     time.sleep(1)
 
     for pg_num in pages:
@@ -95,10 +89,12 @@ def load_data():
             .text
             .split('\n')
         )
-        add_data(page[1:len(page) - len(pages) - 1])
+        add_data(page[1:len(page) - len(pages) - 1], subjects)
+    
+    return subjects
 
 
-def add_data(page):
+def add_data(page, subjects):
     for subject in page:
         data: list[str] = subject.split()[1:]
         course_title = ""
@@ -124,24 +120,33 @@ def add_data(page):
         subjects[key]["Current seats"] = int(data[i+1])
 
 
-def print_data():
+def print_data(subjects):
     for s, v in subjects.items():
         print(f"{s}: {v}")
 
 
-def write_data():
+def write_data(subjects) -> str:
     with open("data.json", "r") as file:
         previous_data = json.load(file)
 
+    message = ""
+    found = False
     for k, v in subjects.items():
         if k not in previous_data or v != previous_data[k]:
-            print()
-            print(f"{k} was updated:\n"
-                  f"\tOld: {previous_data[k] if k in previous_data else 'Was not available'}\n"
-                  f"\tNew: {subjects[k]}.")
+            found = True
+            message += '\n'
+            message += (f"{k} was updated:\n"
+                    f"- Old: "
+                    f"{str(previous_data[k]['Max seats']) +'/'+ str(previous_data[k]['Current seats']) if k in previous_data else 'Was not available'}\n"
+                    f"- New: {subjects[k]['Max seats']}/{subjects[k]['Current seats']}\n")
+    
+    if found:
+        message += "https://portal.psut.edu.jo/"
 
     with open("data.json", "w") as file:
         json.dump(subjects, file, indent=4)
+    
+    return message
 
 
 if __name__ == '__main__':
