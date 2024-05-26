@@ -10,6 +10,7 @@ from variables import USERID, PASSWORD
 import traceback
 import time
 import json
+import asyncio
 
 
 chrome_options = Options()
@@ -28,9 +29,7 @@ regis_url_2 = "https://portal.psut.edu.jo:5050/StudentServices/StudentRegistrati
 def process_data() -> str:
     try:
         login()
-        time.sleep(5)
         nav_to_stud_reg()
-        time.sleep(5)
         dct = load_data()
         print(write_data(dct))
 
@@ -41,7 +40,7 @@ def process_data() -> str:
         driver.quit()
 
 
-def login():
+async def login():
     driver.get(login_url)
     username_field = driver.find_element(By.NAME, "UserID")
     username_field.send_keys(USERID)
@@ -50,32 +49,35 @@ def login():
     password_field.send_keys(Keys.RETURN)
 
 
-def nav_to_stud_reg():
+async def nav_to_stud_reg():
     # Navigate to StudentRegistration
     WebDriverWait(driver, 3).until(EC.url_contains("Home"))
 
     # MUST be done this way, psut website is weird (or I'm stupid)
     driver.get(regis_url)
+    await asyncio.sleep(1)
     driver.get(regis_url_2)
+    await asyncio.sleep(1)
 
     # Change language to english
     driver.find_element(By.ID, "lbtnLanguage").click()
+    await asyncio.sleep(1)
 
     # Click the search button
     driver.find_element(By.ID, "ContentPlaceHolder1_btnSearch").click()
-    time.sleep(2)
+    await asyncio.sleep(2)
 
 
-def load_data():
+async def load_data():
     subjects = {}
 
     # refresh_page
     driver.get(driver.current_url)
-    time.sleep(2)
+    await asyncio.sleep(3)
 
     # Click the search button
     driver.find_element(By.ID, "ContentPlaceHolder1_btnSearch").click()
-    time.sleep(2)
+    await asyncio.sleep(3)
 
     # Do page 1 first as it's the landing page (no page button for current page exists for some reason lol)
     page1 = (
@@ -87,13 +89,12 @@ def load_data():
 
     pages = page1[32:]
     add_data(page1[1:len(page1) - len(pages) - 1], subjects)
-    time.sleep(1)
 
     for pg_num in pages:
         driver.find_element(By.LINK_TEXT, pg_num).click()
 
         # Wait to ensure data loaded after clicking page button
-        time.sleep(1)
+        await asyncio.sleep(3)
         page = (
             driver
             .find_element(By.ID, "ContentPlaceHolder1_gvRegistrationCoursesSchedule")
@@ -136,28 +137,40 @@ def print_data(subjects):
         print(f"{s}: {v}")
 
 
-def write_data(subjects) -> str:
+async def write_data(subjects) -> str:
     with open("data.json", "r") as file:
         previous_data = json.load(file)
 
     message = ""
     found = False
     for k, v in subjects.items():
-        if k not in previous_data or v != previous_data[k]:
+        ms: int = subjects[k]['Max seats']
+        cs: int = subjects[k]['Current seats']
+        in_prev = k in previous_data
+        if not in_prev and ms > cs:
             found = True
             message += '\n'
-            message += (f"{k} was updated:\n"
-                    f"- Old: "
-                    f"{str(previous_data[k]['Max seats']) +'/'+ str(previous_data[k]['Current seats']) if k in previous_data else 'Was not available'}\n"
-                    f"- New: {subjects[k]['Max seats']}/{subjects[k]['Current seats']}\n")
-    
-    if found:
-        message += "https://portal.psut.edu.jo/"
+            message += (f"{k} was just added!\n"
+                        f"- Seats: {ms}/{cs} |⟶ {ms-cs} seat{'s' if ms-cs > 1 else ''} available!\n")
 
-    with open("data.json", "w") as file:
-        json.dump(subjects, file, indent=4)
+        elif in_prev and v != previous_data[k]:
+            if ms > cs:
+                found = True
+                message += '\n'
+                message += (f"{k} ⟶ Seat available!\n"
+                            f"- Seats: {ms}/{cs} |⟶ {ms-cs} seat{'s' if ms-cs > 1 else ''} available!\n")
     
-    return message
+    print(message)
+    if len(message) < 2000:
+        if found:
+            message += "\n[Hurry!](https://portal.psut.edu.jo/)"
+
+        with open("data.json", "w") as file:
+            json.dump(subjects, file, indent=4)
+        
+        return message
+
+    return ''
 
 
 if __name__ == '__main__':
