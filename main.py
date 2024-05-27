@@ -80,12 +80,19 @@ async def load_data():
     await asyncio.sleep(3)
 
     # Do page 1 first as it's the landing page (no page button for current page exists for some reason lol)
-    page1 = (
-        driver
-        .find_element(By.ID, "ContentPlaceHolder1_gvRegistrationCoursesSchedule")
-        .text
-        .split('\n')
-    )
+    while True:
+        try:
+            page1 = (
+                driver
+                .find_element(By.ID, "ContentPlaceHolder1_gvRegistrationCoursesSchedule")
+                .text
+                .split('\n')
+            )
+            break
+
+        except Exception as e: 
+            print(f"error: {e}, retrying")
+            await asyncio.sleep(1)
 
     pages = page1[32:]
     add_data(page1[1:len(page1) - len(pages) - 1], subjects)
@@ -95,12 +102,20 @@ async def load_data():
 
         # Wait to ensure data loaded after clicking page button
         await asyncio.sleep(3)
-        page = (
-            driver
-            .find_element(By.ID, "ContentPlaceHolder1_gvRegistrationCoursesSchedule")
-            .text
-            .split('\n')
-        )
+        while True:
+            try:
+                page = (
+                    driver
+                    .find_element(By.ID, "ContentPlaceHolder1_gvRegistrationCoursesSchedule")
+                    .text
+                    .split('\n')
+                )
+                break
+
+            except Exception as e: 
+                print(f"error: {e}, retrying")
+                await asyncio.sleep(1)
+
         add_data(page[1:len(page) - len(pages) - 1], subjects)
     
     return subjects
@@ -141,6 +156,10 @@ async def write_data(subjects) -> str:
     with open("data.json", "r") as file:
         previous_data = json.load(file)
 
+    # if it's less than 'previous_data - 1' then that means it didn't fetch all of the subject info, so stop override
+    if len(subjects) < len(previous_data) - 1:
+        return ''
+
     message = ""
     found = False
     for k, v in subjects.items():
@@ -149,28 +168,31 @@ async def write_data(subjects) -> str:
         in_prev = k in previous_data
         if not in_prev and ms > cs:
             found = True
-            message += '\n'
-            message += (f"{k} was just added!\n"
+            message += (f"\n{k} was just added!\n"
                         f"- Seats: {ms}/{cs} |⟶ {ms-cs} seat{'s' if ms-cs > 1 else ''} available!\n")
 
         elif in_prev and v != previous_data[k]:
             if ms > cs:
                 found = True
-                message += '\n'
-                message += (f"{k} ⟶ Seat available!\n"
+                message += (f"\n{k} ⟶ Seat available!\n"
                             f"- Seats: {ms}/{cs} |⟶ {ms-cs} seat{'s' if ms-cs > 1 else ''} available!\n")
-    
-    print(message)
-    if len(message) < 2000:
-        if found:
-            message += "\n[Hurry!](https://portal.psut.edu.jo/)"
 
-        with open("data.json", "w") as file:
-            json.dump(subjects, file, indent=4)
+            # if it just became full
+            elif previous_data[k]['Max seats'] > previous_data[k]['Current seats'] and ms == cs:
+                found = True
+                message += f"\n{k} just became full again :pensive:\n"
+    
+    with open("data.json", "w") as file:
+        json.dump(subjects, file, indent=4)
         
+    print(message)
+    if found:
+        message += "\n[Hurry!](https://portal.psut.edu.jo/)"
+
+    if len(message) < 2000:
         return message
 
-    return ''
+    return "Check [PSUT website](https://portal.psut.edu.jo/), too many updates to send here. (could be a bug too..!)"
 
 
 if __name__ == '__main__':

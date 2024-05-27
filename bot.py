@@ -1,4 +1,5 @@
 from discord.ext import commands
+from discord.ext.commands import Context
 from variables import TOKEN
 
 import main
@@ -9,6 +10,7 @@ import asyncio
 intents = discord.Intents.all()
 
 bot = commands.Bot(command_prefix='!', intents=intents)
+_quit = False
 
 
 @bot.event
@@ -17,7 +19,9 @@ async def on_ready():
     await asyncio.sleep(1)
     await main.nav_to_stud_reg()
     await asyncio.sleep(1)
+
     try:
+        print("Ready")
         await update()
 
     except Exception:
@@ -28,6 +32,7 @@ async def on_ready():
     
     finally:
         main.driver.quit()
+        print("quit successful")
 
 @bot.event
 async def update():
@@ -39,15 +44,26 @@ async def update():
     alaa_user = await bot.fetch_user(alaa_id)
 
     while True:
+        print(f"quit is false? {_quit}")
         subjects = await main.load_data()
         updates = await main.write_data(subjects)
         if updates != '':
-            if "Technical Writing" in updates or "Scientific Research" in updates or "Statistical Methods" in updates:
+            if "Technical Writing" in updates or "Statistical Methods" in updates:
                 await me_user.send(updates)
                 await shishi_user.send(updates)
 
             await alaa_user.send(updates)
 
+
+@bot.command(name="quit", description="Turns off the bot")
+async def quit(ctx: Context):
+    if not await bot.is_owner(ctx.message.author):
+        await ctx.send("unauthorized")
+        return
+    
+    # not working for now
+    _quit = True
+    print("quit set to True")
 
 if __name__ == "__main__":
     bot.run(TOKEN)
