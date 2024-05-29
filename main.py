@@ -26,7 +26,7 @@ regis_url = "https://portal.psut.edu.jo/Home/RegWebStudent?target=_blank"
 regis_url_2 = "https://portal.psut.edu.jo:5050/StudentServices/StudentRegistration.aspx"
 
 
-def process_data() -> str:
+def process_data() -> None:
     try:
         login()
         nav_to_stud_reg()
@@ -40,7 +40,7 @@ def process_data() -> str:
         driver.quit()
 
 
-async def login():
+async def login() -> None:
     driver.get(login_url)
     username_field = driver.find_element(By.NAME, "UserID")
     username_field.send_keys(USERID)
@@ -49,7 +49,7 @@ async def login():
     password_field.send_keys(Keys.RETURN)
 
 
-async def nav_to_stud_reg():
+async def nav_to_stud_reg() -> None:
     # Navigate to StudentRegistration
     WebDriverWait(driver, 3).until(EC.url_contains("Home"))
 
@@ -68,7 +68,7 @@ async def nav_to_stud_reg():
     await asyncio.sleep(2)
 
 
-async def load_data():
+async def load_data() -> dict[str, dict[str, int]]:
     subjects = {}
 
     # refresh_page
@@ -80,19 +80,18 @@ async def load_data():
     await asyncio.sleep(3)
 
     # Do page 1 first as it's the landing page (no page button for current page exists for some reason lol)
-    while True:
-        try:
-            page1 = (
-                driver
-                .find_element(By.ID, "ContentPlaceHolder1_gvRegistrationCoursesSchedule")
-                .text
-                .split('\n')
-            )
-            break
+    try:
+        page1 = (
+            driver
+            .find_element(By.ID, "ContentPlaceHolder1_gvRegistrationCoursesSchedule")
+            .text
+            .split('\n')
+        )
 
-        except Exception as e: 
-            print(f"error: {e}, retrying")
-            await asyncio.sleep(1)
+    except Exception as e: 
+        print(f"error: {e}, retrying")
+        await asyncio.sleep(1)
+        return await load_data()
 
     pages = page1[32:]
     add_data(page1[1:len(page1) - len(pages) - 1], subjects)
@@ -102,26 +101,25 @@ async def load_data():
 
         # Wait to ensure data loaded after clicking page button
         await asyncio.sleep(3)
-        while True:
-            try:
-                page = (
-                    driver
-                    .find_element(By.ID, "ContentPlaceHolder1_gvRegistrationCoursesSchedule")
-                    .text
-                    .split('\n')
-                )
-                break
+        try:
+            page = (
+                driver
+                .find_element(By.ID, "ContentPlaceHolder1_gvRegistrationCoursesSchedule")
+                .text
+                .split('\n')
+            )
 
-            except Exception as e: 
-                print(f"error: {e}, retrying")
-                await asyncio.sleep(1)
+        except Exception as e: 
+            print(f"error: {e}, retrying")
+            await asyncio.sleep(1)
+            return await load_data()
 
         add_data(page[1:len(page) - len(pages) - 1], subjects)
     
     return subjects
 
 
-def add_data(page, subjects):
+def add_data(page, subjects) -> None:
     for subject in page:
         data: list[str] = subject.split()[1:]
         course_title = ""
@@ -147,7 +145,7 @@ def add_data(page, subjects):
         subjects[key]["Current seats"] = int(data[i+1])
 
 
-def print_data(subjects):
+def print_data(subjects) -> None:
     for s, v in subjects.items():
         print(f"{s}: {v}")
 

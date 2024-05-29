@@ -44,7 +44,6 @@ async def update():
     alaa_user = await bot.fetch_user(alaa_id)
 
     while True:
-        print(f"quit is false? {_quit}")
         subjects = await main.load_data()
         updates = await main.write_data(subjects)
         if updates != '':
@@ -57,11 +56,13 @@ async def update():
 
 @bot.command(name="quit", description="Turns off the bot")
 async def quit(ctx: Context):
+    # not working for now
+    return
+
     if not await bot.is_owner(ctx.message.author):
         await ctx.send("unauthorized")
         return
     
-    # not working for now
     _quit = True
     print("quit set to True")
 
