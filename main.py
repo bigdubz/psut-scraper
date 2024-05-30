@@ -69,18 +69,18 @@ async def nav_to_stud_reg() -> None:
 
 
 async def load_data() -> dict[str, dict[str, int]]:
-    subjects = {}
-
-    # refresh_page
-    driver.get(driver.current_url)
-    await asyncio.sleep(3)
-
-    # Click the search button
-    driver.find_element(By.ID, "ContentPlaceHolder1_btnSearch").click()
-    await asyncio.sleep(3)
-
-    # Do page 1 first as it's the landing page (no page button for current page exists for some reason lol)
     try:
+        subjects = {}
+
+        # refresh_page
+        driver.get(driver.current_url)
+        await asyncio.sleep(3)
+
+        # Click the search button
+        driver.find_element(By.ID, "ContentPlaceHolder1_btnSearch").click()
+        await asyncio.sleep(3)
+
+        # Do page 1 first as it's the landing page (no page button for current page exists for some reason lol)
         page1 = (
             driver
             .find_element(By.ID, "ContentPlaceHolder1_gvRegistrationCoursesSchedule")
@@ -88,20 +88,14 @@ async def load_data() -> dict[str, dict[str, int]]:
             .split('\n')
         )
 
-    except Exception as e: 
-        print(f"error: {e}, retrying")
-        await asyncio.sleep(1)
-        return await load_data()
+        pages = page1[32:]
+        add_data(page1[1:len(page1) - len(pages) - 1], subjects)
 
-    pages = page1[32:]
-    add_data(page1[1:len(page1) - len(pages) - 1], subjects)
+        for pg_num in pages:
+            driver.find_element(By.LINK_TEXT, pg_num).click()
 
-    for pg_num in pages:
-        driver.find_element(By.LINK_TEXT, pg_num).click()
-
-        # Wait to ensure data loaded after clicking page button
-        await asyncio.sleep(3)
-        try:
+            # Wait to ensure data loaded after clicking page button
+            await asyncio.sleep(3)
             page = (
                 driver
                 .find_element(By.ID, "ContentPlaceHolder1_gvRegistrationCoursesSchedule")
@@ -109,13 +103,13 @@ async def load_data() -> dict[str, dict[str, int]]:
                 .split('\n')
             )
 
-        except Exception as e: 
-            print(f"error: {e}, retrying")
-            await asyncio.sleep(1)
-            return await load_data()
-
-        add_data(page[1:len(page) - len(pages) - 1], subjects)
+            add_data(page[1:len(page) - len(pages) - 1], subjects)
     
+    except Exception as e: 
+        print(f"error: {e}, retrying")
+        await asyncio.sleep(1)
+        return await load_data()
+
     return subjects
 
 
@@ -128,9 +122,7 @@ def add_data(page, subjects) -> None:
             if data[0].isdigit():
                 break
 
-            else:
-                course_title += f"{data[0]} "
-
+            course_title += f"{data[0]} "
             data.pop(0)
 
         key = f"{course_title}Section {data[1]}"
