@@ -5,10 +5,8 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
-from bs4 import BeautifulSoup
 from variables import USERID, PASSWORD
 import traceback
-import time
 import json
 import asyncio
 
@@ -17,6 +15,10 @@ chrome_options = Options()
 chrome_options.add_argument("--headless")
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.add_argument("--disable-features=WebML")
+chrome_options.add_argument("--disable-features=WebAI")
+chrome_options.add_argument("--incognito")
+chrome_options.add_argument("--disable-extensions")
 
 service = ChromeService()
 driver = webdriver.Chrome(service=service, options=chrome_options)
@@ -26,12 +28,12 @@ regis_url = "https://portal.psut.edu.jo/Home/RegWebStudent?target=_blank"
 regis_url_2 = "https://portal.psut.edu.jo:5050/StudentServices/StudentRegistration.aspx"
 
 
-def process_data() -> None:
+async def process_data() -> None:
     try:
-        login()
-        nav_to_stud_reg()
-        dct = load_data()
-        print(write_data(dct))
+        await login()
+        await nav_to_stud_reg()
+        dct = await load_data()
+        await write_data(dct)
 
     except Exception:
         print(traceback.format_exc())
@@ -72,7 +74,7 @@ async def load_data() -> dict[str, dict[str, int]]:
     try:
         subjects = {}
 
-        # refresh_page
+        # refresh page
         driver.get(driver.current_url)
         await asyncio.sleep(3)
 
@@ -159,13 +161,13 @@ async def write_data(subjects) -> str:
         if not in_prev and ms > cs:
             found = True
             message += (f"\n{k} was just added!\n"
-                        f"- Seats: {ms}/{cs} |⟶ {ms-cs} seat{'s' if ms-cs > 1 else ''} available!\n")
+                        f"- Seats: {cs}/{ms} |⟶ {ms-cs} seat{'s' if ms-cs > 1 else ''} available!\n")
 
         elif in_prev and v != previous_data[k]:
             if ms > cs:
                 found = True
                 message += (f"\n{k} ⟶ Seat available!\n"
-                            f"- Seats: {ms}/{cs} |⟶ {ms-cs} seat{'s' if ms-cs > 1 else ''} available!\n")
+                            f"- Seats: {cs}/{ms} |⟶ {ms-cs} seat{'s' if ms-cs > 1 else ''} available!\n")
 
             # if it just became full
             elif previous_data[k]['Max seats'] > previous_data[k]['Current seats'] and ms == cs:
@@ -173,17 +175,15 @@ async def write_data(subjects) -> str:
                 message += f"\n{k} just became full again :pensive:\n"
     
     with open("data.json", "w") as file:
+        print("writing new data")
         json.dump(subjects, file, indent=4)
+        print("wrote new data")
         
-    print(message)
     if found:
+        print(message)
         message += "\n[Hurry!](https://portal.psut.edu.jo/)"
 
     if len(message) < 2000:
         return message
 
     return "Check [PSUT website](https://portal.psut.edu.jo/), too many updates to send here. (could be a bug too..!)"
-
-
-if __name__ == '__main__':
-    process_data()
