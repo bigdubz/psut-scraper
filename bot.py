@@ -1,50 +1,39 @@
 from discord.ext import commands
-from discord.ext.commands import Context
 from variables import TOKEN
 
-import main
 import discord
-import traceback
 import asyncio
 
 intents = discord.Intents.all()
 
 bot = commands.Bot(command_prefix='!', intents=intents)
-_quit = False
+
+async def handleClient(reader, writer):
+    data = await reader.read(100)
+    msg = data.decode()
+
+    await bot.myUser.send(f"📢 {msg}")
+
+    writer.close()
+    await writer.wait_closed()
+
+
+async def startServer():
+    server = await asyncio.start_server(handleClient, "127.0.0.1", 65432)
+    async with server:
+        print("listening")
+        await server.serve_forever()
+
 
 
 @bot.event
 async def on_ready():
-    print("started")
-    await main.login()
-    await asyncio.sleep(1)
-    await main.nav_to_stud_reg()
-    await asyncio.sleep(1)
+    me = 451301920364167179
+    bot.myUser = await bot.fetch_user(me)
+    await bot.myUser.send("test")
+    bot.loop.create_task(startServer())
 
-    try:
-        print("Ready")
-        await update()
-
-    except Exception:
-        print(traceback.format_exc())
-
-        # Keep trying
-        await update()
-    
-    finally:
-        main.driver.quit()
-        print("quit successful")
-
-@bot.event
-async def update():
-
-    while True:
-        print("looping")
-        subjects = await main.load_data()
-        updates = await main.write_data(subjects)
-        # if "x" in updates, await (await bot.fetch_user(ID)).send(updates)
-                
-        await asyncio.sleep(5)
 
 if __name__ == "__main__":
-    bot.run(TOKEN)
+    if TOKEN is not None:
+        bot.run(TOKEN)

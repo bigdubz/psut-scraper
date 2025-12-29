@@ -1,189 +1,162 @@
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
+from playwright.sync_api import sync_playwright
 from variables import USERID, PASSWORD
-import traceback
-import json
-import asyncio
+import socket
 
-
-chrome_options = Options()
-chrome_options.add_argument("--headless")
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
-chrome_options.add_argument("--disable-features=WebML")
-chrome_options.add_argument("--disable-features=WebAI")
-chrome_options.add_argument("--incognito")
-chrome_options.add_argument("--disable-extensions")
-
-service = ChromeService()
-driver = webdriver.Chrome(service=service, options=chrome_options)
 
 login_url = "https://portal.psut.edu.jo/"
 regis_url = "https://portal.psut.edu.jo/Home/RegWebStudent?target=_blank"
 regis_url_2 = "https://portal.psut.edu.jo:5050/StudentServices/StudentRegistration.aspx"
 
 
-async def process_data() -> None:
-    try:
-        await login()
-        await nav_to_stud_reg()
-        dct = await load_data()
-        await write_data(dct)
+row_id_start = "ContentPlaceHolder1_gvRegistrationCoursesSchedule_lblGv"
 
-    except Exception:
-        print(traceback.format_exc())
-    
-    finally:
-        driver.quit()
+course_number     = "CourseNo_"
+course_name       = "CourseNameEn_"
+course_hours      = "Hours_"
+course_section    = "Sections_"
+course_instructor = "InstructorEn_"
+course_day        = "DayEn_"
+course_startTime  = "StartTime_"
+course_classroom  = "ClassRoomsEn_"
+course_maxCap     = "MaxStNo_"
+course_registered = "RegStNo_"
 
+add_course_btn = "ContentPlaceHolder1_gvRegistrationCoursesSchedule_lbtnAddCourse_{number}"
 
-async def login() -> None:
-    driver.get(login_url)
-    username_field = driver.find_element(By.NAME, "UserID")
-    username_field.send_keys(USERID)
-    password_field = driver.find_element(By.NAME, "Password")
-    password_field.send_keys(PASSWORD)
-    password_field.send_keys(Keys.RETURN)
+tableRowCount = "ContentPlaceHolder1_gvRegistrationCoursesSchedule tr"
 
+mon_wed = 3 
+stt = 2
 
-async def nav_to_stud_reg() -> None:
-    # Navigate to StudentRegistration
-    WebDriverWait(driver, 3).until(EC.url_contains("Home"))
-
-    # MUST be done this way, psut website is weird (or I'm stupid)
-    driver.get(regis_url)
-    await asyncio.sleep(1)
-    driver.get(regis_url_2)
-    await asyncio.sleep(1)
-
-    # Change language to english
-    driver.find_element(By.ID, "lbtnLanguage").click()
-    await asyncio.sleep(1)
-
-    # Click the search button
-    driver.find_element(By.ID, "ContentPlaceHolder1_btnSearch").click()
-    await asyncio.sleep(2)
+coursesIWant = ['31254', '31374', '11316']
+coursesIFollow = ['11435']
 
 
-async def load_data() -> dict[str, dict[str, int]]:
-    try:
-        subjects = {}
-
-        # refresh page
-        driver.get(driver.current_url)
-        await asyncio.sleep(3)
-
-        # Click the search button
-        driver.find_element(By.ID, "ContentPlaceHolder1_btnSearch").click()
-        await asyncio.sleep(3)
-
-        # Do page 1 first as it's the landing page (no page button for current page exists for some reason lol)
-        page1 = (
-            driver
-            .find_element(By.ID, "ContentPlaceHolder1_gvRegistrationCoursesSchedule")
-            .text
-            .split('\n')
-        )
-
-        pages = page1[32:]
-        add_data(page1[1:len(page1) - len(pages) - 1], subjects)
-
-        for pg_num in pages:
-            driver.find_element(By.LINK_TEXT, pg_num).click()
-
-            # Wait to ensure data loaded after clicking page button
-            await asyncio.sleep(3)
-            page = (
-                driver
-                .find_element(By.ID, "ContentPlaceHolder1_gvRegistrationCoursesSchedule")
-                .text
-                .split('\n')
-            )
-
-            add_data(page[1:len(page) - len(pages) - 1], subjects)
-    
-    except Exception as e: 
-        print(f"error: {e}, retrying")
-        await asyncio.sleep(1)
-        return await load_data()
-
-    return subjects
+sections = ['2','3','1']
+sectionsIFollow = ['1']
 
 
-def add_data(page, subjects) -> None:
-    for subject in page:
-        data: list[str] = subject.split()[1:]
-        course_title = ""
+def notifyBot(message: str):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect(("127.0.0.1", 65432))
+        s.sendall(message.encode())
 
-        while True:
-            if data[0].isdigit():
+
+def login(loginPage):
+    loginPage.fill('input[id="UserID"]', USERID)
+    loginPage.fill('input[id="loginPass"]', PASSWORD)
+    loginPage.press('input[id="loginPass"]', 'Enter')
+    loginPage.wait_for_timeout(1000)
+    loginPage.goto(regis_url)
+    loginPage.wait_for_timeout(1000)
+    loginPage.goto(regis_url_2)
+    loginPage.wait_for_timeout(1000)
+    return loginPage
+
+
+def searchForCourse(page, course_id) -> bool:
+    course_input = page.locator("#ContentPlaceHolder1_TxtCourseNo")
+    if not course_input.count():
+        return False
+
+    course_input.fill(course_id)
+
+    # search button (ASP.NET postback)
+    search_btn = page.locator("#ContentPlaceHolder1_btnSearch")
+    if not search_btn.count():
+        return False
+
+    search_btn.click()
+    return True
+
+
+def search(page):
+    for crs, course in enumerate(coursesIWant):
+        #section = sections[crs]
+
+        if not searchForCourse(page, course):
+            continue
+
+        page.wait_for_timeout(500)
+
+        # table rows (skip header)
+        rows = page.locator(f"#{tableRowCount}").count()
+        for i in range(rows):
+            sec_cell = page.locator(f"#{row_id_start}{course_section}{i}")
+
+            if not sec_cell.count():
+                continue
+
+            sec = sec_cell.text_content()
+            if sec is not None:
+                sec = sec.strip()
+
+            add_btn = page.locator(f"a#{add_course_btn.format(number=i)}")
+            #if sec == section and add_btn.count():
+            if add_btn.count():
+                notifyBot(f"registered for course with course id {course}")
+                add_btn.click()
+                page.wait_for_timeout(2000)
+
+                coursesIWant.remove(course)
                 break
 
-            course_title += f"{data[0]} "
-            data.pop(0)
 
-        key = f"{course_title}Section {data[1]}"
-        subjects[key] = {}
-        i = -2
+    for ind, course in enumerate(coursesIFollow):
+        section = sections[ind]
+        if not searchForCourse(page, course):
+            continue
 
-        # If course is not full (it would add two items, "Add" and "course")
-        if "Add" in data:
-            i -= 2
+        page.wait_for_timeout(500)
 
-        subjects[key]["Max seats"] = int(data[i])
-        subjects[key]["Current seats"] = int(data[i+1])
+        rows = page.locator(f"#{tableRowCount}").count()
+        for i in range(rows):
+            sec_cell = page.locator(f"#{row_id_start}{course_section}{i}")
+
+            if not sec_cell.count():
+                continue
+
+            sec = sec_cell.text_content()
+            if sec is not None:
+                sec = sec.strip()
+
+            add_btn = page.locator(f"a#{add_course_btn.format(number=i)}")
+            if sec == section and add_btn.count():
+                notifyBot(f"{course} has an empty spot!")
+                pass # send signal to bot to send me a message
 
 
-def print_data(subjects) -> None:
-    for s, v in subjects.items():
-        print(f"{s}: {v}")
+    # refresh state safely
+    page.reload(wait_until="domcontentloaded")
 
 
-async def write_data(subjects) -> str:
-    with open("data.json", "r") as file:
-        previous_data = json.load(file)
 
-    # if it's less than 'previous_data - 1' then that means it didn't fetch all of the subject info, so stop override
-    if len(subjects) < len(previous_data) - 1:
-        return ''
+def main():
+    notifyBot("this is a test from main()")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        context = browser.new_context()
+        page = context.new_page()
 
-    message = ""
-    found = False
-    for k, v in subjects.items():
-        ms: int = subjects[k]['Max seats']
-        cs: int = subjects[k]['Current seats']
-        in_prev = k in previous_data
-        if not in_prev and ms > cs:
-            found = True
-            message += (f"\n{k} was just added!\n"
-                        f"- Seats: {cs}/{ms} |⟶ {ms-cs} seat{'s' if ms-cs > 1 else ''} available!\n")
+        while coursesIWant:
+            try:
+                page.goto(login_url)
+                page = login(page)
 
-        elif in_prev and v != previous_data[k]:
-            if ms > cs:
-                found = True
-                message += (f"\n{k} ⟶ Seat available!\n"
-                            f"- Seats: {cs}/{ms} |⟶ {ms-cs} seat{'s' if ms-cs > 1 else ''} available!\n")
+                # language button
+                lang_btn = page.locator("#lbtnLanguage")
+                if lang_btn.count():
+                    lang_btn.click()
+                page.wait_for_timeout(2000)
 
-            # if it just became full
-            elif previous_data[k]['Max seats'] > previous_data[k]['Current seats'] and ms == cs:
-                found = True
-                message += f"\n{k} just became full again :pensive:\n"
-    
-    with open("data.json", "w") as file:
-        print("writing new data")
-        json.dump(subjects, file, indent=4)
-        print("wrote new data")
-        
-    if found:
-        print(message)
-        message += "\n[Hurry!](https://portal.psut.edu.jo/)"
 
-    if len(message) < 2000:
-        return message
+                while coursesIWant:
+                    search(page)
 
-    return "Check [PSUT website](https://portal.psut.edu.jo/), too many updates to send here. (could be a bug too..!)"
+            except:
+                notifyBot("something failed, reset")
+                return
+
+
+main()
+
