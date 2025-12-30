@@ -73,14 +73,13 @@ def searchForCourse(page, course_id) -> bool:
 def search(page):
     for crs, course in enumerate(coursesIWant):
         #section = sections[crs]
-
         if not searchForCourse(page, course):
             continue
 
         page.wait_for_timeout(500)
 
         # table rows (skip header)
-        rows = page.locator(f"#{tableRowCount}").count()
+        rows = page.locator(f"#{tableRowCount}").count() - 1
         for i in range(rows):
             sec_cell = page.locator(f"#{row_id_start}{course_section}{i}")
 
@@ -104,12 +103,13 @@ def search(page):
 
     for ind, course in enumerate(coursesIFollow):
         section = sections[ind]
+
         if not searchForCourse(page, course):
             continue
 
         page.wait_for_timeout(500)
 
-        rows = page.locator(f"#{tableRowCount}").count()
+        rows = page.locator(f"#{tableRowCount}").count() - 1
         for i in range(rows):
             sec_cell = page.locator(f"#{row_id_start}{course_section}{i}")
 
@@ -132,30 +132,36 @@ def search(page):
 
 
 def main():
-    notifyBot("this is a test from main()")
+    notifyBot("Started")
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
         while True:
+            browser = None
             try:
+                browser = p.chromium.launch(headless=False)
                 context = browser.new_context()
                 page = context.new_page()
 
                 page.goto(login_url)
                 page = login(page)
 
-                # language button
                 lang_btn = page.locator("#lbtnLanguage")
                 if lang_btn.count():
                     lang_btn.click()
-                page.wait_for_timeout(2000)
 
+                page.wait_for_timeout(2000)
 
                 while coursesIWant:
                     search(page)
 
-            except:
-                notifyBot("something failed, reset")
-                continue
+            except Exception as e:
+                notifyBot(f"something failed, resetting...\n{e}")
+
+            finally:
+                try:
+                    if browser:
+                        browser.close()
+                except:
+                    pass
 
 
 main()
