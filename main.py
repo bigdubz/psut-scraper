@@ -135,11 +135,11 @@ def main():
     notifyBot("this is a test from main()")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
-        context = browser.new_context()
-        page = context.new_page()
+        try:
+            context = browser.new_context()
+            page = context.new_page()
 
-        while coursesIWant:
-            try:
+            while coursesIWant:
                 page.goto(login_url)
                 page = login(page)
 
@@ -153,9 +153,9 @@ def main():
                 while coursesIWant:
                     search(page)
 
-            except:
-                notifyBot("something failed, reset")
-                return
+        except:
+            notifyBot("something failed, reset")
+            return
 
 
 main()
