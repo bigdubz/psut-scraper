@@ -28,12 +28,12 @@ tableRowCount = "ContentPlaceHolder1_gvRegistrationCoursesSchedule tr"
 mon_wed = 3 
 stt = 2
 
-coursesIWant = ['31254', '31374', '11316']
-coursesIFollow = ['11435']
+coursesIWant = ['31254']
+coursesIFollow = []
 
 
-sections = ['2','3','1']
-sectionsIFollow = ['1']
+sections = ['2']
+sectionsIFollow = []
 
 
 def notifyBot(message: str):
