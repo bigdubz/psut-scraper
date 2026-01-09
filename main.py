@@ -1,6 +1,16 @@
 from playwright.sync_api import sync_playwright
 from variables import USERID, PASSWORD
 import socket
+import threading
+
+
+response_event = threading.Event()
+request_event = threading.Event()
+latest_request = None
+latest_result = None
+lock = threading.Lock()
+
+TIMEOUT = 5
 
 
 login_url = "https://portal.psut.edu.jo/"
@@ -42,6 +52,50 @@ def notifyBot(message: str):
         s.sendall(message.encode())
 
 
+def handle_bot(conn):
+    global latest_request, latest_result
+
+    try:
+        data = conn.recv(1024).decode()
+
+        with lock:
+            latest_request = data
+            latest_result = None
+
+        request_event.set()
+
+        if not response_event.wait(timeout=TIMEOUT):
+            conn.sendall(b"Something went wrong, timeout hit")
+            return
+
+        with lock:
+            response = latest_result or "ERROR: empty response"
+
+        conn.sendall(response.encode())
+
+    except Exception as e:
+        try:
+            conn.sendall(f"ERROR: {e}".encode())
+
+        except:
+
+            pass
+
+    finally:
+        response_event.clear()
+        conn.close()
+
+
+def start_request_server():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("127.0.0.1", 65433))
+    s.listen()
+
+    while True:
+        conn, _ = s.accept()
+        threading.Thread(target=handle_bot, args=(conn,), daemon=True).start()
+
+
 def login(loginPage):
     loginPage.fill('input[id="UserID"]', USERID)
     loginPage.fill('input[id="loginPass"]', PASSWORD)
@@ -71,8 +125,7 @@ def searchForCourse(page, course_id) -> bool:
 
 
 def search(page):
-    for crs, course in enumerate(coursesIWant):
-        #section = sections[crs]
+    for course in coursesIWant:
         if not searchForCourse(page, course):
             continue
 
@@ -86,12 +139,20 @@ def search(page):
             if not sec_cell.count():
                 continue
 
+
             sec = sec_cell.text_content()
             if sec is not None:
                 sec = sec.strip()
 
+            if request_event.is_set():
+                with lock:
+                    global latest_result
+                    latest_result = f"the service is working properly: section cell: {sec}"
+                
+                request_event.clear()
+                response_event.set()
+
             add_btn = page.locator(f"a#{add_course_btn.format(number=i)}")
-            #if sec == section and add_btn.count():
             if add_btn.count():
                 notifyBot(f"registered for course with course id {course}")
                 add_btn.click()
