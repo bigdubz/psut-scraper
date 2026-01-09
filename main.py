@@ -194,6 +194,7 @@ def search(page):
 
 def main():
     notifyBot("Started")
+    start_request_server()
     with sync_playwright() as p:
         while True:
             browser = None
