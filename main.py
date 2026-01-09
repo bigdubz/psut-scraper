@@ -198,7 +198,7 @@ def main():
         while True:
             browser = None
             try:
-                browser = p.chromium.launch(headless=False)
+                browser = p.chromium.launch(headless=True)
                 context = browser.new_context()
                 page = context.new_page()
 
