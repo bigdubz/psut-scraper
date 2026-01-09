@@ -42,8 +42,8 @@ async def get_status(ctx):
         response = await loop.run_in_executor(None, request_from_main, "get_message")
         await ctx.send(f"📨 {response}")
 
-    except:
-        await ctx.send("main.py did not respond in time (timeout)")
+    except Exception as e:
+        await ctx.send(f"main.py did not respond in time ({e})")
 
 
 @bot.event
