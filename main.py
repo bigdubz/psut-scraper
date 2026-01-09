@@ -93,8 +93,12 @@ def start_request_server():
 
     while True:
         conn, _ = s.accept()
-        threading.Thread(target=handle_bot, args=(conn,), daemon=True).start()
+        handle_bot(conn)
 
+threading.Thread(
+        target=start_request_server,
+        daemon=True
+).start()
 
 def login(loginPage):
     loginPage.fill('input[id="UserID"]', USERID)
@@ -194,7 +198,6 @@ def search(page):
 
 def main():
     notifyBot("Started")
-    start_request_server()
     with sync_playwright() as p:
         while True:
             browser = None
